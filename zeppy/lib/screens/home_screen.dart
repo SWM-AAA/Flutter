@@ -13,7 +13,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final Completer<GoogleMapController> _controller =
       Completer<GoogleMapController>();
-
   static const CameraPosition _kGooglePlex = CameraPosition(
     target: LatLng(
       37.540853,
@@ -30,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       tilt: 59.440717697143555,
       zoom: 19.151926040649414);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -37,12 +37,24 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Map Connect'),
         backgroundColor: Colors.blue.shade300,
       ),
-      body: GoogleMap(
-        mapType: MapType.terrain, // hybrid, normal
-        initialCameraPosition: _kGooglePlex,
-        onMapCreated: (GoogleMapController controller) {
-          _controller.complete(controller);
-        },
+      body: Column(
+        children: [
+          SizedBox(
+            height: 500,
+            child: GoogleMap(
+              mapType: MapType.terrain, // hybrid, normal
+              initialCameraPosition: _kGooglePlex,
+              onMapCreated: (GoogleMapController controller) {
+                _controller.complete(controller);
+              },
+            ),
+          ),
+          // IconButton(
+          //   onPressed: _determinePosition,
+          //   iconSize: 120,
+          //   icon: const Icon(Icons.location_on_outlined),
+          // )
+        ],
       ),
       // floatingActionButton: FloatingActionButton.extended(
       //   onPressed: _goToTheLake,
