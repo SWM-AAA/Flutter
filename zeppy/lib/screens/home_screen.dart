@@ -15,42 +15,57 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final Completer<GoogleMapController> _controller =
       Completer<GoogleMapController>();
-  late StreamSubscription<Position> _positionStream;
-  late Future<Position> currentLocation = _determinePosition();
+  late StreamSubscription<Position> positionStream;
+  late Future<Position> currentLocation = getCurrentIfPossible();
   late LocationSettings locationSettings;
+  Set<Marker> _markers = {};
   @override
   void initState() {
     super.initState();
-    currentLocation = _determinePosition();
-    locationSettings = _determineLocationSetting();
+    currentLocation = getCurrentIfPossible();
+    // locationSettings = determineLocationSetting();// updatable : 이 함수가 readme그대로 한건데,,, 동작하지 않아서 임시로 기본코드 아래 입력
     locationSettings = const LocationSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: 1,
     );
 
-    _positionStream =
-        Geolocator.getPositionStream(locationSettings: locationSettings)
-            .listen((Position position) {
-      _updateMapCameraPosition(position);
+    positionStream = Geolocator.getPositionStream(
+            locationSettings:
+                locationSettings) // 최소 1m 움직였을때 listen해서 아래 updateMapCameraPosition 실행
+        .listen((Position position) {
+      updateMapCameraPosition(position);
     });
   }
 
-  Future<void> _updateMapCameraPosition(Position position) async {
+  Future<void> updateMapCameraPosition(Position position) async {
     final GoogleMapController controller = await _controller.future;
     LatLng latLng = LatLng(position.latitude, position.longitude);
     CameraPosition cameraPosition = CameraPosition(target: latLng, zoom: 15);
     controller.animateCamera(CameraUpdate.newCameraPosition(cameraPosition));
-    // _updateMarkerPosition(latLng);
+    updateMyMarkerPosition(latLng);
+  }
+
+  // 현재 위치를 표시하는 빨간색 마커, 내 위치를 다른 아이콘으로 표기하고싶을때 사용할것같다.
+  void updateMyMarkerPosition(LatLng latLng) {
+    Marker marker = Marker(
+      markerId: const MarkerId('current_location'),
+      position: latLng,
+    );
+    setState(() {
+      _markers = <Marker>{marker};
+    });
   }
 
   @override
   void dispose() {
-    _positionStream.cancel();
+    // 끝날때 스트리밍 종료
+    positionStream.cancel();
     super.dispose();
   }
 
-  static const CameraPosition _kGooglePlex = CameraPosition(
+  static const CameraPosition initCameraPosition = CameraPosition(
     target: LatLng(
+      // 건국대 위치
       37.540853,
       127.078971,
     ),
@@ -61,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Map Connect'),
+        title: const Text('Google Map Test'),
         backgroundColor: Colors.blue.shade300,
       ),
       body: Column(
@@ -70,21 +85,22 @@ class _HomeScreenState extends State<HomeScreen> {
             height: 500,
             child: GoogleMap(
               mapType: MapType.terrain, // hybrid, normal
-              initialCameraPosition: _kGooglePlex,
+              initialCameraPosition: initCameraPosition,
               onMapCreated: (GoogleMapController controller) {
                 _controller.complete(controller);
                 // _mapController = controller;
               },
-              myLocationEnabled: true,
-              myLocationButtonEnabled: false,
-              compassEnabled: true,
-              mapToolbarEnabled: true,
+              myLocationEnabled: true, // 내 위치를 중앙 파란점 + 방향 화살표
+              myLocationButtonEnabled: false, // 우측 상단 내위치로 버튼
+              compassEnabled: true, // 맵 회전시 다시 북쪽을 향하게하는 나침반
+              mapToolbarEnabled: false, // 모르겠음
+              markers: _markers,
             ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _goToCurrentLocation,
+        onPressed: goToCurrentPosition,
         label: const Text('current location!'),
         icon: const Icon(Icons.location_on_outlined),
       ),
@@ -92,13 +108,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  LocationSettings _determineLocationSetting() {
+  LocationSettings determineLocationSetting() {
     late LocationSettings locationSettings;
     if (defaultTargetPlatform == TargetPlatform.android) {
-      print("androidandroidandroidandroid");
+      // 안드로이드
       locationSettings = AndroidSettings(
           accuracy: LocationAccuracy.high,
-          distanceFilter: 1,
+          distanceFilter: 1, // 불러오는 최소 수평이동거리
           forceLocationManager: true,
           intervalDuration: const Duration(seconds: 10),
           //(Optional) Set foreground notification config to keep the app alive
@@ -111,8 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ));
     } else if (defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS) {
-      print("iOSiOSiOSiOSiOSiOS");
-
+      // ios
       locationSettings = AppleSettings(
         accuracy: LocationAccuracy.high,
         activityType: ActivityType.fitness,
@@ -122,8 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
         showBackgroundLocationIndicator: false,
       );
     } else {
-      print("elseelseelseelseelse");
-
+      // 디폴트
       locationSettings = const LocationSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 100,
@@ -132,25 +146,27 @@ class _HomeScreenState extends State<HomeScreen> {
     return locationSettings;
   }
 
-  Future<void> _goToCurrentLocation() async {
+  // map camera를 현재위치로 이동
+  Future<void> goToCurrentPosition() async {
     final GoogleMapController controller = await _controller.future;
     Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high);
     print('Location: ${position.latitude}, ${position.longitude}');
 
-    CameraPosition kLake = CameraPosition(
-      // bearing: 192.8334901395799,
+    CameraPosition currentCamera = CameraPosition(
+      // 다른 파라미터로는  bearing과 tilt가 있다
       target: LatLng(
         position.latitude,
         position.longitude,
       ),
-      // tilt: 59.440717697143555,
       zoom: 19.151926040649414,
     );
-    await controller.animateCamera(CameraUpdate.newCameraPosition(kLake));
+    await controller
+        .animateCamera(CameraUpdate.newCameraPosition(currentCamera));
   }
 
-  Future<Position> _determinePosition() async {
+  // 위치권한이 있다면 현재 위치 불러오기
+  Future<Position> getCurrentIfPossible() async {
     bool serviceEnabled;
     LocationPermission permission;
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
