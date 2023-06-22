@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -33,15 +34,15 @@ class _HomeScreenState extends State<HomeScreen> {
             locationSettings:
                 locationSettings) // 최소 1m 움직였을때 listen해서 아래 updateMapCameraPosition 실행
         .listen((Position position) {
-      updateMapCameraPosition(position);
+      // updateMapCameraPosition(position);
     });
   }
 
   Future<void> updateMapCameraPosition(Position position) async {
     final GoogleMapController controller = await _controller.future;
     LatLng latLng = LatLng(position.latitude, position.longitude);
-    CameraPosition cameraPosition = CameraPosition(target: latLng, zoom: 15);
-    controller.animateCamera(CameraUpdate.newCameraPosition(cameraPosition));
+    // CameraPosition cameraPosition = CameraPosition(target: latLng, zoom: 15);
+    // controller.animateCamera(CameraUpdate.newCameraPosition(cameraPosition));
     updateMyMarkerPosition(latLng);
   }
 
@@ -53,6 +54,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     setState(() {
       _markers = <Marker>{marker};
+    });
+  }
+
+  // 마커 추가하느 함수
+  void addMarker() {
+    int randomInt = Random().nextInt(100);
+    LatLng latLng = LatLng(
+      37.540853 + (randomInt * 0.1),
+      127.078971 + (randomInt * 0.1),
+    );
+    Marker marker = Marker(
+      markerId: MarkerId(randomInt.toString()),
+      position: latLng,
+    );
+    print(latLng);
+    print(randomInt);
+    setState(() {
+      _markers.add(marker);
     });
   }
 
@@ -96,6 +115,11 @@ class _HomeScreenState extends State<HomeScreen> {
               mapToolbarEnabled: false, // 모르겠음
               markers: _markers,
             ),
+          ),
+          IconButton(
+            onPressed: addMarker,
+            icon: const Icon(Icons.add_location_alt_outlined),
+            iconSize: 30,
           ),
         ],
       ),
