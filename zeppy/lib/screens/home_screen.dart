@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+
+import '../widgets/map_camera_marker_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,7 +21,9 @@ class _HomeScreenState extends State<HomeScreen> {
   late StreamSubscription<Position> positionStream;
   late Future<Position> currentLocation = getCurrentIfPossible();
   late LocationSettings locationSettings;
+  late CameraPosition stoCameraPosition;
   Set<Marker> _markers = {};
+  bool isMapCameraMove = false;
   @override
   void initState() {
     super.initState();
@@ -33,15 +38,15 @@ class _HomeScreenState extends State<HomeScreen> {
             locationSettings:
                 locationSettings) // 최소 1m 움직였을때 listen해서 아래 updateMapCameraPosition 실행
         .listen((Position position) {
-      updateMapCameraPosition(position);
+      // updateMapCameraPosition(position);
     });
   }
 
   Future<void> updateMapCameraPosition(Position position) async {
     final GoogleMapController controller = await _controller.future;
     LatLng latLng = LatLng(position.latitude, position.longitude);
-    CameraPosition cameraPosition = CameraPosition(target: latLng, zoom: 15);
-    controller.animateCamera(CameraUpdate.newCameraPosition(cameraPosition));
+    // CameraPosition cameraPosition = CameraPosition(target: latLng, zoom: 15);
+    // controller.animateCamera(CameraUpdate.newCameraPosition(cameraPosition));
     updateMyMarkerPosition(latLng);
   }
 
@@ -53,6 +58,23 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     setState(() {
       _markers = <Marker>{marker};
+    });
+  }
+
+  // 마커 추가하느 함수
+  void addMarker() {
+    int randomInt = Random().nextInt(100);
+    LatLng latLng = LatLng(
+      37.540853 + (randomInt * 0.001),
+      127.078971 + (randomInt * 0.001),
+    );
+    Marker marker = Marker(
+      markerId: MarkerId(randomInt.toString()),
+      position: latLng,
+    );
+
+    setState(() {
+      _markers.add(marker);
     });
   }
 
@@ -83,19 +105,43 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           SizedBox(
             height: 500,
-            child: GoogleMap(
-              mapType: MapType.terrain, // hybrid, normal
-              initialCameraPosition: initCameraPosition,
-              onMapCreated: (GoogleMapController controller) {
-                _controller.complete(controller);
-                // _mapController = controller;
-              },
-              myLocationEnabled: true, // 내 위치를 중앙 파란점 + 방향 화살표
-              myLocationButtonEnabled: false, // 우측 상단 내위치로 버튼
-              compassEnabled: true, // 맵 회전시 다시 북쪽을 향하게하는 나침반
-              mapToolbarEnabled: false, // 모르겠음
-              markers: _markers,
-            ),
+            child: Stack(children: [
+              GoogleMap(
+                mapType: MapType.normal, // hybrid, normal
+                initialCameraPosition: initCameraPosition,
+                onMapCreated: (GoogleMapController controller) {
+                  _controller.complete(controller);
+                },
+                myLocationEnabled: true, // 내 위치를 중앙 파란점 + 방향 화살표
+                myLocationButtonEnabled: false, // 우측 상단 내위치로 버튼
+                compassEnabled: true, // 맵 회전시 다시 북쪽을 향하게하는 나침반
+                mapToolbarEnabled: false, // 모르겠음
+                markers: _markers,
+                onCameraIdle: () {
+                  // 카메라가 멈추면
+                  setState(() {
+                    isMapCameraMove = false;
+                  });
+                },
+                onCameraMoveStarted: () {
+                  // 카메라가 움직이기 시작하면
+                  setState(() {
+                    isMapCameraMove = true;
+                  });
+                },
+              ),
+              MapCameraMarkerWidget(isMapCameraMove: isMapCameraMove),
+            ]),
+          ),
+          IconButton(
+            onPressed: addMarker,
+            icon: Icon(Icons.add_location_alt_outlined),
+            iconSize: 30,
+          ),
+          IconButton(
+            onPressed: addMarker,
+            icon: Icon(Icons.check_outlined),
+            iconSize: 30,
           ),
         ],
       ),
@@ -108,13 +154,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // 현재 위치를 읽어오는 기준 세팅
   LocationSettings determineLocationSetting() {
     late LocationSettings locationSettings;
     if (defaultTargetPlatform == TargetPlatform.android) {
       // 안드로이드
       locationSettings = AndroidSettings(
           accuracy: LocationAccuracy.high,
-          distanceFilter: 1, // 불러오는 최소 수평이동거리
+          distanceFilter: 10, // 불러오는 최소 수평이동거리
           forceLocationManager: true,
           intervalDuration: const Duration(seconds: 10),
           //(Optional) Set foreground notification config to keep the app alive
