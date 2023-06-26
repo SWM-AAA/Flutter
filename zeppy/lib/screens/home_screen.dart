@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../widgets/alert_dialog_widget.dart';
 import '../widgets/map_camera_marker_widget.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -24,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late CameraPosition stoCameraPosition;
   Set<Marker> _markers = {};
   bool isMapCameraMove = false;
+  CameraPosition cameraPosition = initCameraPosition;
   @override
   void initState() {
     super.initState();
@@ -38,15 +40,15 @@ class _HomeScreenState extends State<HomeScreen> {
             locationSettings:
                 locationSettings) // 최소 1m 움직였을때 listen해서 아래 updateMapCameraPosition 실행
         .listen((Position position) {
-      // updateMapCameraPosition(position);
+      updateMapCameraPosition(position);
     });
   }
 
   Future<void> updateMapCameraPosition(Position position) async {
     final GoogleMapController controller = await _controller.future;
     LatLng latLng = LatLng(position.latitude, position.longitude);
-    // CameraPosition cameraPosition = CameraPosition(target: latLng, zoom: 15);
-    // controller.animateCamera(CameraUpdate.newCameraPosition(cameraPosition));
+    CameraPosition cameraPosition = CameraPosition(target: latLng, zoom: 15);
+    controller.animateCamera(CameraUpdate.newCameraPosition(cameraPosition));
     updateMyMarkerPosition(latLng);
   }
 
@@ -113,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _controller.complete(controller);
                 },
                 myLocationEnabled: true, // 내 위치를 중앙 파란점 + 방향 화살표
-                myLocationButtonEnabled: false, // 우측 상단 내위치로 버튼
+                myLocationButtonEnabled: true, // 우측 상단 내위치로 버튼
                 compassEnabled: true, // 맵 회전시 다시 북쪽을 향하게하는 나침반
                 mapToolbarEnabled: false, // 모르겠음
                 markers: _markers,
@@ -129,6 +131,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     isMapCameraMove = true;
                   });
                 },
+                onCameraMove: (position) {
+                  cameraPosition = position;
+                },
               ),
               MapCameraMarkerWidget(isMapCameraMove: isMapCameraMove),
             ]),
@@ -138,10 +143,10 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.add_location_alt_outlined),
             iconSize: 30,
           ),
-          IconButton(
-            onPressed: addMarker,
-            icon: Icon(Icons.check_outlined),
-            iconSize: 30,
+          alert_dialog_widget(
+            titleString: "Camera Position",
+            contentString:
+                'Latitude: ${cameraPosition.target.latitude}; Longitude: ${cameraPosition.target.longitude}',
           ),
         ],
       ),
@@ -161,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // 안드로이드
       locationSettings = AndroidSettings(
           accuracy: LocationAccuracy.high,
-          distanceFilter: 10, // 불러오는 최소 수평이동거리
+          distanceFilter: 1, // 불러오는 최소 수평이동거리
           forceLocationManager: true,
           intervalDuration: const Duration(seconds: 10),
           //(Optional) Set foreground notification config to keep the app alive
